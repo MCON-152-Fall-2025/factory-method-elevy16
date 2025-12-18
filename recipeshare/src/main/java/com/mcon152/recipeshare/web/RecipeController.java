@@ -6,6 +6,9 @@ import com.mcon152.recipeshare.service.RecipeService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.net.URI;
 import java.util.List;
@@ -13,6 +16,10 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/recipes")
 public class RecipeController {
+
+    // create Logger object
+    private static final Logger logger = LoggerFactory.getLogger(RecipeController.class);
+
     private final RecipeService recipeService;
 
     public RecipeController(RecipeService recipeService) {
@@ -25,9 +32,20 @@ public class RecipeController {
      */
     @PostMapping
     public ResponseEntity<Recipe> addRecipe(@RequestBody RecipeRequest recipeRequest) {
+
+        logger.info("POST /api/recipes: request received");
+
+        // DEBUG summary
+        logger.debug("POST /api/recipes: body summary - title={}, type={}",
+                recipeRequest.getTitle(), recipeRequest.getType());
+
+        // MDC
+        MDC.put("recipeTitle", recipeRequest.getTitle());
+
         try {
             Recipe toSave = RecipeFactory.createFromRequest(recipeRequest);
             Recipe saved = recipeService.addRecipe(toSave);
+            logger.info("POST /api/recipes: created recipe with id={}", saved.getId());
 
             URI location = ServletUriComponentsBuilder
                     .fromCurrentRequest()           // /api/recipes
@@ -37,7 +55,11 @@ public class RecipeController {
 
             return ResponseEntity.created(location).body(saved);
         } catch (Exception e) {
+            logger.error("POST /api/recipes: unexpected error - {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
+        }
+        finally {
+            MDC.remove("recipeTitle");
         }
     }
 
@@ -46,7 +68,13 @@ public class RecipeController {
      */
     @GetMapping
     public ResponseEntity<List<Recipe>> getAllRecipes() {
-        return ResponseEntity.ok(recipeService.getAllRecipes());
+        logger.info("GET /api/recipes: request received.");
+
+        List<Recipe> recipes = recipeService.getAllRecipes();
+
+        logger.info("GET /api/recipes: success, returned {} recipes.", recipes.size());
+
+        return ResponseEntity.ok(recipes);
     }
 
     /**
@@ -54,9 +82,22 @@ public class RecipeController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<Recipe> getRecipeById(@PathVariable long id) {
-        return recipeService.getRecipeById(id)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        logger.info("GET /api/recipes/{}: request received.", id);
+
+        try {
+            return recipeService.getRecipeById(id)
+                    .map(recipe -> {
+                        logger.info("GET /api/recipes/{}: success", id);
+                        return ResponseEntity.ok(recipe);
+                    })
+                    .orElseGet(() -> {
+                        logger.warn("GET /api/recipes/{}: not found", id);
+                        return ResponseEntity.notFound().build();
+                    });
+        } catch (Exception e) {
+            logger.error("GET /api/recipes/{}: unexpected error - {}", id, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
@@ -64,12 +105,19 @@ public class RecipeController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteRecipe(@PathVariable long id) {
+        logger.info("DELETE /api/recipes/{}: request received.", id);
         try {
             boolean deleted = recipeService.deleteRecipe(id);
-            return deleted
-                    ? ResponseEntity.noContent().build()
-                    : ResponseEntity.notFound().build();
+
+            if (deleted) {
+                logger.info("DELETE /api/recipes/{}: deleted successfully", id);
+                return ResponseEntity.noContent().build();
+            } else {
+                logger.warn("DELETE /api/recipes/{}: not deleted (not found)", id);
+                return ResponseEntity.notFound().build();
+            }
         } catch (Exception e) {
+            logger.error("DELETE /api/recipes/{}: unexpected error - {}", id, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -79,10 +127,35 @@ public class RecipeController {
      */
     @PutMapping("/{id}")
     public ResponseEntity<Recipe> updateRecipe(@PathVariable long id, @RequestBody RecipeRequest updatedRequest) {
-        Recipe updatedRecipe = RecipeFactory.createFromRequest(updatedRequest);
-        return recipeService.updateRecipe(id, updatedRecipe)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        logger.info("PUT /api/recipes/{}: request received.", id);
+
+        // DEBUG summary
+        logger.debug("PUT /api/recipes/{}: body summary - title={}, type={}",
+                id, updatedRequest.getTitle(), updatedRequest.getType());
+
+        // MDC
+        MDC.put("recipeTitle", updatedRequest.getTitle());
+
+
+        try {
+            Recipe updatedRecipe = RecipeFactory.createFromRequest(updatedRequest);
+
+            return recipeService.updateRecipe(id, updatedRecipe)
+                    .map( recipe -> {
+                        logger.info("PUT /api/recipes/{}: success", id);
+                        return ResponseEntity.ok(recipe);
+                            })
+                    .orElseGet(() -> {
+                        logger.warn("PUT /api/recipes/{}: not found", id);
+                        return ResponseEntity.notFound().build();
+                    });
+        } catch (Exception e) {
+            logger.error("PUT /api/recipes/{}: unexpected error - {}", id, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+        finally {
+            MDC.remove("recipeTitle");
+        }
     }
 
     /**
@@ -90,9 +163,35 @@ public class RecipeController {
      */
     @PatchMapping("/{id}")
     public ResponseEntity<Recipe> patchRecipe(@PathVariable long id, @RequestBody RecipeRequest partialRequest) {
-        Recipe partialRecipe = RecipeFactory.createFromRequest(partialRequest);
-        return recipeService.patchRecipe(id, partialRecipe)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        logger.info("PATCH /api/recipes/{}: request received.", id);
+
+        // DEBUG summary
+        logger.debug("PATCH /api/recipes/{}: body summary - title={}, type={}",
+                id, partialRequest.getTitle(), partialRequest.getType());
+
+        // MDC
+        MDC.put("recipeTitle", partialRequest.getTitle());
+
+        try {
+            Recipe partialRecipe = RecipeFactory.createFromRequest(partialRequest);
+
+            return recipeService.patchRecipe(id, partialRecipe)
+                    .map(recipe -> {
+                        logger.info("PATCH /api/recipes/{}: success", id);
+                        return ResponseEntity.ok(recipe);
+                    })
+                    .orElseGet(() -> {
+                        logger.warn("PATCH /api/recipes/{}: not found", id);
+                        return ResponseEntity.notFound().build();
+                    });
+        } catch (Exception e) {
+            logger.error("PATCH /api/recipes/{}: unexpected error - {}", id, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+
+        // remove MDC
+        finally {
+            MDC.remove("recipeTitle");
+        }
     }
 }
