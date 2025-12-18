@@ -129,3 +129,16 @@ For questions or feedback, please open an issue on GitHub.
 
 - [Spring Boot Documentation](https://spring.io/projects/spring-boot)
 - [Apache Maven Documentation](https://maven.apache.org/guides/index.html)
+## Running RecipeShare on Linux with Maven
+
+To run the application on the Azure Linux VM:
+```bash
+cd ~/repos/factory-method-elevy16/recipeshare
+mvn spring-boot:run
+
+To access it from your local machine using SSH port forwarding:
+ssh -L 8082:localhost:8081 -p 5004 student@lab-4ed578fd-b81a-4c04-8372-c8f445078601.eastus.cloudapp.azure.com
+
+Then open a browser on your local machine and go to:
+http://localhost:8082
+
